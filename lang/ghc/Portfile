@@ -1,0 +1,208 @@
+# $Id: Portfile 75061 2011-01-13 21:07:47Z ryandesign@macports.org $
+
+PortSystem	1.0
+PortGroup	archcheck 1.0
+
+name		ghc
+set canonicalname	ghc
+version		7.0.2
+categories	lang haskell
+maintainers	gwright
+platforms	darwin
+description	The Glorious Glasgow Haskell Compilation System
+long_description	\
+		The Glasgow Haskell Compiler is a robust,		\
+		fully-featured, optimising compiler and interactive	\
+		environment for Haskell 98, GHC compiles Haskell to	\
+		either native code or C.  It implements numerous	\
+		experimental language extensions to Haskell 98,		\
+		for example: concurrency, a foreign language interface,	\
+		multi-parameter type classes, scoped type variables,	\
+		existential and universal quantification, unboxed	\
+		types, exceptions, weak pointers, and so on.		\
+		GHC comes with a generational garbage collector,	\
+		and a space and time profiler.
+
+homepage	http://haskell.org/${canonicalname}
+master_sites	${homepage}/dist/${version}/
+
+use_bzip2	yes
+
+distfiles	${canonicalname}-${version}-src.tar.bz2			\
+		testsuite-${version}.tar.bz2
+
+checksums       ${canonicalname}-${version}-src.tar.bz2 \
+                    md5     946a18a0dc30437db72c0d3fdf26ca42 \
+                    sha1    6303f73daa3ef2c4df1bd24b2d97ae81d7944e63 \
+                    rmd160  2a6a57bea73252b5bb4ed603221659e9b9e7482e \
+                testsuite-${version}.tar.bz2 \
+                    md5     88e878414d5e4bdc8724cfa5b6e0d1c3 \
+                    sha1    de2a04c19d75e4622e52e1ab79a60df977109d38 \
+                    rmd160  897aef8eca1c15a54e030ab546d5bdfd9e5c5f67
+
+# ghc does not support a universal build:
+universal_variant	no
+
+worksrcdir	${canonicalname}-${version}
+
+
+post-extract {
+     system "tar jxf ${distpath}/testsuite-${version}.tar.bz2 -C ${worksrcpath}" 
+}
+
+pre-configure	{
+		system "${prefix}/bin/autoreconf263 ${worksrcpath}"
+
+		set cfg [open "${workpath}/ghc-bootstrap/bin/ghc-pkg" w]
+		puts $cfg "#!/bin/sh"
+		if {${ghc_bootversion} eq "6.10.4"} {
+			puts $cfg "GHCPKGBIN=${workpath}/ghc-bootstrap/lib/ghc-${ghc_bootversion}/ghc-pkg"
+		} else {
+			puts $cfg "GHCPKGBIN=${workpath}/ghc-bootstrap/lib/ghc-${ghc_bootversion}/ghc-pkg.bin"
+		}
+		puts $cfg "PKGCONF=${workpath}/ghc-bootstrap/lib/ghc-${ghc_bootversion}/package.conf"
+		puts $cfg "exec \$GHCPKGBIN --global-conf \$PKGCONF \${1+\"\$@\"}"
+		close $cfg
+
+		system "chmod +x ${workpath}/ghc-bootstrap/bin/ghc-pkg"
+
+		set cfg [open "${workpath}/ghc-bootstrap/bin/hsc2hs" w]
+		puts $cfg "#!/bin/sh"
+		if {${ghc_bootversion} eq "6.10.4"} {
+			puts $cfg "HSC2HSBIN=${workpath}/ghc-bootstrap/lib/ghc-${ghc_bootversion}/hsc2hs"
+		} else {
+			puts $cfg "HSC2HSBIN=${workpath}/ghc-bootstrap/lib/ghc-${ghc_bootversion}/hsc2hs-bin"
+		}
+		if {${ghc_bootversion} eq "6.10.1" || ${ghc_bootversion} eq "6.10.4"} {
+			puts $cfg "tflag=\"--template=${workpath}/ghc-bootstrap/lib/ghc-${ghc_bootversion}/hsc2hs-0.67/template-hsc.h\""
+		} else {
+			puts $cfg "tflag=\"--template=${workpath}/ghc-bootstrap/lib/ghc-${ghc_bootversion}/template-hsc.h\""
+		}
+		puts $cfg "for arg do"
+		puts $cfg "    case \"\$arg\" in"
+		puts $cfg "        -c*)	         HSC2HS_EXTRA=;;"
+		puts $cfg "        --cc=*)       HSC2HS_EXTRA=;;"
+		puts $cfg "	   -t*)	         tflag=;;"
+		puts $cfg "        --template=*) tflag=;;"
+		puts $cfg "        --)           break;;"
+		puts $cfg "    esac"
+		puts $cfg "done"
+		if { ${configure.build_arch} == "i386" && ${os.platform} == "darwin" && ${os.major} == 10 } {
+			puts $cfg "exec \$HSC2HSBIN --cflag=\"-m32\" --lflag=\"-m32\" \$tflag \$HSC2HS_EXTRA -I${prefix}/include --lflag=\"-L${prefix}/lib\" \${1+\"\$@\"}"
+		} else {
+			puts $cfg "exec \$HSC2HSBIN \$tflag \$HSC2HS_EXTRA -I${prefix}/include --lflag=\"-L${prefix}/lib\" \${1+\"\$@\"}"
+		}
+		close $cfg
+
+		system "chmod +x ${workpath}/ghc-bootstrap/bin/hsc2hs"
+
+		set cfg [open "${worksrcpath}/mk/build.mk" w]
+	  	puts $cfg "#"
+	  	puts $cfg "# Local configuration overrides for MacPorts"
+	  	puts $cfg "#"
+	  	puts $cfg "SRC_HC_OPTS += -L${worksrcpath}/libffi"
+	  	puts $cfg "SRC_HC_OPTS += -I${prefix}/include -L${prefix}/lib"
+
+		if {[variant_isset maintainer_debug]} {
+			puts $cfg "SRC_HC_OPTS += -v -keep-tmp-files"
+		}
+
+	  	puts $cfg "EXTRA_HSC2HS_OPTS += -I${prefix}/include --lflag=\"-L${prefix}/lib\""
+	  	puts $cfg "EXTRA_LD_OPTS += -L${worksrcpath}/libffi"
+	  	puts $cfg "EXTRA_LD_OPTS += -L${prefix}/lib"
+		puts $cfg "EXTRA_CABAL_CONFIGURE_FLAGS += --extra-include-dirs=${prefix}/include"
+		puts $cfg "EXTRA_CABAL_CONFIGURE_FLAGS += --extra-lib-dirs=${prefix}/lib"
+
+		if {[variant_isset cabal_configure_debug]} then {
+			puts $cfg "EXTRA_CABAL_CONFIGURE_FLAGS += --verbose=3"
+		}
+
+		if { ${configure.build_arch} == "i386" && ${os.platform} == "darwin" && ${os.major} == 10 } {
+			puts $cfg "SRC_HC_OPTS += -optP-m32 -optc-m32 -opta-m32 -optl-m32"
+			puts $cfg "GHC_CC_OPTS += -optP-m32 -optc-m32 -opta-m32 -optl-m32"
+
+			puts $cfg "EXTRA_HSC2HC_OPTS += -optc-m32 -opta-m32 -optl-m32"
+
+			puts $cfg "EXTRA_CABAL_CONFIGURE_FLAGS += --ghc-option=-optP-m32"
+			puts $cfg "EXTRA_CABAL_CONFIGURE_FLAGS += --ghc-option=-optc-m32"
+			puts $cfg "EXTRA_CABAL_CONFIGURE_FLAGS += --ghc-option=-opta-m32"
+			puts $cfg "EXTRA_CABAL_CONFIGURE_FLAGS += --ghc-option=-optl-m32"
+		}
+
+	  	close $cfg
+}
+
+#bugs		GHC does not support DESTDIR. Instead, we install	\
+#		everything into ${destroot}${prefix}, and then fix up	\
+#		the five scripts which actually have the installation	\
+#		path hard coded.					\
+#									\
+#		The odd "ac_cv_lib_elf_nlist" environment variable	\
+#		is required to avoid including the wrong nlist.h	\
+#		header if libelf is installed on the system.
+
+configure.ldflags-append	"-L/usr/lib"
+configure.cflags-append		"-I${prefix}/include"
+configure.env-append	DYLD_FALLBACK_LIBRARY_PATH=${prefix}/lib	\
+			ac_cv_lib_elf_nlist=no
+
+configure.pre_args	--prefix=${destroot}${prefix}
+configure.args  --datadir=${destroot}${prefix}/share/${canonicalname}-${version}	\
+		--with-gmp-includes=${prefix}/include					\
+		--with-gmp-libraries=${prefix}/lib					\
+		--with-ghc='${workpath}/${canonicalname}-bootstrap/bin/ghc' 		\
+		--with-gcc=${configure.cc}
+
+# The configure script needs to be told the platform explicitly if we're on x86_64:
+if { ${configure.build_arch} == "x86_64" } {
+	configure.args-append	--build=x86_64-apple-darwin	\
+				--host=x86_64-apple-darwin	\
+				--target=x86_64-apple-darwin
+}
+
+build	{
+	system "cd ${worksrcpath} && env DYLD_FALLBACK_LIBRARY_PATH=${prefix}/lib ${build.cmd}"
+}
+
+# Note that we catch the results of the tests, since usually at least
+# one of the tests unexpectedly fails.
+
+set testlog ${canonicalname}-${version}-tests.log
+
+test {
+     set testpath    ${worksrcpath}/testsuite-${version}
+     system "cd ${testpath} && make stage=2 2>&1 | tee ${workpath}/${testlog}"
+}
+
+
+post-destroot	{
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/bin/ghc
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/bin/ghc-${version}
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/bin/ghci
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/bin/ghci-${version}
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/bin/ghc-pkg
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/bin/ghc-pkg-${version}
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/bin/haddock
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/bin/hsc2hs
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/bin/runghc
+
+	reinplace "s|\\\$@\"\}|\\\$@\"\} -L${prefix}/lib -I${prefix}/include |" ${destroot}${prefix}/bin/ghc
+	reinplace s|${destroot}${prefix}|${prefix}|g ${destroot}${prefix}/lib/${canonicalname}-${version}/package.conf
+
+	file rename ${destroot}${prefix}/lib/${canonicalname}-${version}/libffi.a ${destroot}${prefix}/lib/${canonicalname}-${version}/libHsLocalFfi.a
+	reinplace s|"ffi"|"HsLocalFfi"| ${destroot}${prefix}/lib/${canonicalname}-${version}/package.conf
+
+        system "ranlib ${destroot}${prefix}/lib/ghc-${version}/*.a"
+
+	if {[file exists ${workpath}/${testlog}]} {
+		set testsavepath ${prefix}/share/${canonicalname}-${version}/tests
+		file mkdir  ${destroot}${testsavepath}
+		file rename ${workpath}/${testlog} ${destroot}${testsavepath}/${testlog}
+		ui_msg "Test results are saved in ${testsavepath}"
+	}
+}
+
+livecheck.type	regex
+livecheck.url	${homepage}
+livecheck.regex	"GHC (\[0-9\\.\]+) Released"
+
