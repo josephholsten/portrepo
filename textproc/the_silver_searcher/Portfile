@@ -1,0 +1,18 @@
+# $Id$
+
+PortSystem       1.0
+PortGroup        github 1.0
+
+github.setup     ggreer the_silver_searcher 0.7.2
+categories       textproc
+maintainers      josephholsten openmaintainer
+platforms        darwin
+license          Apache-2.0
+description      A code-searching tool similar to ack, but faster.
+long_description \
+  An attempt to make something better than ack, which itself is better than grep.
+
+checksums           rmd160  7fc867cd6065b5946eb4dd89d60a734aa0b09396 \
+                    sha256  c81d88c111adf4610d340bd0bf2987a5512a8502dc16eb21421d53f014f174fb
+
+use_autoreconf   yes
