@@ -1,0 +1,85 @@
+# $Id: Portfile 73111 2010-11-04 06:11:53Z elelay@macports.org $
+
+PortSystem              1.0
+PortGroup               xcode 1.0
+
+name			Growl
+set base_version	1.2.1
+version			${base_version}
+platforms		darwin
+maintainers		boeyms openmaintainer
+description		global notification system for Mac OS X
+long_description	Growl is a global notification system for Mac OS X. Any \
+				application can send a notification to Growl, which will \
+				display an attractive message on your screen.
+
+homepage		http://growl.info/
+
+master_sites		http://growl.googlecode.com/files/
+
+checksums           md5     b4578a73cc906856f4accdbc1a484d1b \
+                    sha1    fe8a3638b101cc5d060ec85cef9310d4b7cb6037 \
+                    rmd160  cf1cfae070fbd8e5401beb1211590542cab4fe22
+
+use_bzip2		yes
+distname		${distname}-src
+extract.suffix		.tbz
+
+# xcode.target		Growl
+# destroot.destdir	DSTROOT=${worksrcpath}/build
+# xcode.destroot.path	/destroot
+
+# Common/Source/LoginItemAE.c uses Carbon so can't build x86_64
+# supported_archs		i386 ppc
+
+# post-patch {
+# 	reinplace "s|REVISION=.*|REVISION=116|g" ${worksrcpath}/generateHgRevision.sh
+# }
+# 
+# # install only Growl.prefPane
+# post-destroot {
+# 	xinstall -d "${destroot}/Library/Preference Panes"
+# 	move ${worksrcpath}/build/destroot/Growl.prefPane "${destroot}/Library/Preference Panes"
+# }
+
+# The old behaviour of automatically installing the contributed extras in the
+# source distribution has been disabled for now, as it is not apparent that
+# every Growl user will want these.  They should probably go into other ports,
+# in any case.
+
+# the 10.4 SDK might not be installed, use the system's default
+# platform darwin 10 {
+# 	patchfiles-append patch-Growl.xcodeproj__project.pbxproj.no-10.4sdk.diff
+# }
+# 
+# # disables separate strip
+# platform darwin 8 {
+# 	patchfiles-append patch-Growl.xcodeproj__project.pbxproj.no_separate_strip.diff
+# }
+
+# this proc is overriden to remove the SYMROOT=build/ configuration
+# overwise, Extras/GrowlAction builds in Extras/GrowlAction/build instead of build
+# proc xcode::get_build_args {args} {
+#     global tcl_platform
+#     global configure.universal_archs configure.build_arch macosx_deployment_target
+#     global os.major os.arch
+#     global developer_dir configure.sdkroot
+# 
+#     set xcode_build_args "OBJROOT=build/"
+# 
+#     # MACOSX_DEPLOYMENT_TARGET
+#     append xcode_build_args " MACOSX_DEPLOYMENT_TARGET=${macosx_deployment_target}"
+# 
+#     # ARCHS
+#     if {[variant_exists universal] && [variant_isset universal]} {
+#         append xcode_build_args " ARCHS=\"${configure.universal_archs}\""
+#     } else {
+#         append xcode_build_args " ARCHS=${configure.build_arch}"
+#     }
+# 
+#     # SDKROOT
+#     append xcode_build_args " SDKROOT=\"${configure.sdkroot}\""
+# 
+#     return $xcode_build_args
+# }
+
